@@ -1,8 +1,16 @@
 // MurmurHash3 x86_32 (Austin Appleby, public domain) over the UTF-8 bytes of a string.
 const enc = new TextEncoder();
+let scratch = new Uint8Array(256);
+
+// Encode into a reused buffer: rendezvous hashes n strings per key, and a fresh
+// Uint8Array per call was most of its cost.
+function utf8(str) {
+  if (str.length * 3 > scratch.length) scratch = new Uint8Array(str.length * 3);
+  return scratch.subarray(0, enc.encodeInto(str, scratch).written);
+}
 
 export function murmur3(input, seed = 0) {
-  const bytes = typeof input === "string" ? enc.encode(input) : input;
+  const bytes = typeof input === "string" ? utf8(input) : input;
   const len = bytes.length;
   const nblocks = len >>> 2;
   let h = seed >>> 0;
