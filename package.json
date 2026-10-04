@@ -1,0 +1,11 @@
+{
+  "name": "consistent-hash-lab",
+  "version": "0.1.0",
+  "description": "Consistent hashing compared under one seeded key set: a vnode ring, jump hash, rendezvous hashing and bounded loads, with load spread and keys moved on resize.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test"
+  }
+}
