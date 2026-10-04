@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Consistent Hash Lab</title>
+  <meta name="description" content="Which keys move when a cache node joins: modulo hashing, a vnode ring, jump hash, rendezvous hashing and bounded loads compared on one seeded key set in the browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">consistent-hash-lab</p>
+      <h1>Add one cache node, lose 90% of your cache</h1>
+      <p class="lede">With <code>hash(key) % n</code>, growing a cluster from 10 to 11 nodes gives almost every
+        key a new owner, and every one of those is a cold miss. Consistent hashing moves only the
+        <strong>1/(n+1)</strong> share the new node should take. Below, one seeded key set runs through
+        <strong>five schemes</strong>: modulo, a vnode ring, jump hash, rendezvous hashing and bounded
+        loads. Everything runs in this tab.</p>
+    </header>
+
+    <h2 class="section-h">1. One node joins</h2>
+    <p class="section-p">Each card places every key on <span id="nText"></span>, then again on one more,
+      and counts the keys whose owner changed. The bars are keys per node before the join, with the
+      fair share marked.</p>
+    <form id="controls" class="panel" aria-label="Simulation settings">
+      <label>Nodes <output name="nodesOut"></output>
+        <input type="range" name="nodes" min="3" max="32" value="10">
+      </label>
+      <label>Vnodes per node <output name="vnodesOut"></output>
+        <input type="range" name="vnodes" min="1" max="400" value="100">
+      </label>
+      <label>Keys <output name="keysOut"></output>
+        <input type="range" name="keys" min="2000" max="30000" step="2000" value="20000">
+      </label>
+      <label>Bounded-load epsilon <output name="epsOut"></output>
+        <input type="range" name="eps" min="0.05" max="1" step="0.05" value="0.25">
+      </label>
+      <label>Seed <output name="seedOut"></output>
+        <input type="range" name="seed" min="1" max="50" value="1">
+      </label>
+    </form>
+    <section class="grid" id="cards" aria-live="polite"></section>
+
+    <h2 class="section-h">2. The ring</h2>
+    <section class="panel ringwrap">
+      <canvas id="ring" role="img" aria-label="Hash ring with each node's arcs in its own colour"></canvas>
+      <div>
+        <p>Each node hashes <code>node#0</code>, <code>node#1</code> and so on onto a 32-bit circle. A key
+          goes to the first point clockwise from its own hash, so each coloured arc is the share of keys
+          that node owns. With one point per node the arcs are wildly uneven; with a hundred they average
+          out, which is why the ring card above flattens as the vnode slider goes up.</p>
+        <p>Jump hash and rendezvous need no ring. Jump hash runs a 64-bit LCG seeded by the key and
+          jumps through bucket numbers in O(log n) with no memory, but only the last bucket can leave.
+          Rendezvous scores every node against the key and takes the top score, which costs O(n) per
+          lookup and lets any node leave.</p>
+        <p>Bounded loads keep the ring and add a cap: no node may hold more than
+          ceil((1 + epsilon) * m / n) of the m keys placed so far, and a key whose node is full walks on
+          to the next one with room.</p>
+      </div>
+    </section>
+
+    <h2 class="section-h">3. In code</h2>
+    <section class="panel api">
+      <div>
+        <p>Each scheme is one small module with no dependencies, tested with <code>node --test</code> for
+          the property that makes it consistent: when a node joins, keys only move to that node.</p>
+        <ol class="sources">
+          <li><a href="https://dl.acm.org/doi/10.1145/258533.258660">Karger et al., Consistent Hashing and Random Trees, STOC 1997</a></li>
+          <li><a href="https://arxiv.org/abs/1406.2294">Lamping, Veach, A Fast, Minimal Memory, Consistent Hash Algorithm, 2014</a></li>
+          <li><a href="https://doi.org/10.1109/90.663936">Thaler, Ravishankar, Using Name-Based Mappings to Increase Hit Rates, IEEE/ACM ToN 1998</a></li>
+          <li><a href="https://arxiv.org/abs/1608.01350">Mirrokni, Thorup, Zadimoghaddam, Consistent Hashing with Bounded Loads, SODA 2018</a></li>
+        </ol>
+      </div>
+      <pre><code>import { createRing } from "./src/ring.js";
+import { jumpHash } from "./src/jump.js";
+import { rendezvous } from "./src/rendezvous.js";
+
+const ring = createRing({ vnodes: 100 });
+["cache-a", "cache-b", "cache-c"].forEach((n) => ring.add(n));
+ring.lookup("user:42");          // one of the three
+
+jumpHash("user:42", 3);          // bucket 0..2
+rendezvous("user:42", ["a", "b", "c"],
+  { weights: { a: 1, b: 2, c: 1 } });</code></pre>
+    </section>
+  </main>
+
+  <script type="module">
+    import { SCHEMES, compare, makeKeys } from "./src/sim.js";
+    import { createRing } from "./src/ring.js";
+
+    const LABELS = {
+      modulo: "hash % n",
+      ring: "Vnode ring",
+      jump: "Jump hash",
+      rendezvous: "Rendezvous",
+      bounded: "Bounded loads",
+    };
+    const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const pct = (v) => `${(v * 100).toFixed(1)}%`;
+
+    function canvasCtx(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      const ctx = canvas.getContext("2d");
+      ctx.scale(dpr, dpr);
+      return { ctx, w, h };
+    }
+
+    const form = document.getElementById("controls");
+    const cardsEl = document.getElementById("cards");
+    const settings = () => {
+      const v = (n) => Number(form.elements[n].value);
+      return { nodes: v("nodes"), vnodes: v("vnodes"), keys: v("keys"), eps: v("eps"), seed: v("seed") };
+    };
+
+    function render() {
+      const s = settings();
+      form.elements.nodesOut.value = s.nodes;
+      form.elements.vnodesOut.value = s.vnodes;
+      form.elements.keysOut.value = s.keys.toLocaleString();
+      form.elements.epsOut.value = s.eps.toFixed(2);
+      form.elements.seedOut.value = s.seed;
+      document.getElementById("nText").textContent = `${s.nodes} nodes`;
+
+      const rows = compare({ keys: makeKeys(s.keys, s.seed), nodes: s.nodes, vnodes: s.vnodes, eps: s.eps, schemes: SCHEMES });
+      const cards = rows.map((r) => {
+        const el = document.createElement("article");
+        const good = r.moved < r.ideal * 1.5;
+        el.className = `panel card ${good ? "ok" : "bad"}`;
+        el.innerHTML = `
+          <header><h3>${LABELS[r.scheme]}</h3><span class="verdict">${good ? "consistent" : "reshuffles"}</span></header>
+          <div class="big"><strong style="color:var(${good ? "--ok" : "--no"})">${pct(r.moved)}</strong><span>of keys moved, ideal ${pct(r.ideal)}</span></div>
+          <canvas role="img" aria-label="${LABELS[r.scheme]}: keys per node, busiest node ${r.peakOverMean.toFixed(2)} times the fair share"></canvas>
+          <dl>
+            <div class="${r.peakOverMean > 1.2 ? "bad" : ""}"><dt>busiest</dt><dd>${r.peakOverMean.toFixed(2)}x</dd></div>
+            <div><dt>cv</dt><dd>${pct(r.cv)}</dd></div>
+          </dl>`;
+        return { el, r };
+      });
+      cardsEl.replaceChildren(...cards.map((c) => c.el));
+
+      requestAnimationFrame(() => {
+        for (const { el, r } of cards) {
+          const { ctx, w, h } = canvasCtx(el.querySelector("canvas"));
+          const mean = s.keys / s.nodes, top = Math.max(...r.loads, mean * 1.6);
+          const bw = w / r.loads.length;
+          ctx.fillStyle = css("--accent");
+          r.loads.forEach((l, i) => {
+            const bh = (l / top) * h;
+            ctx.fillRect(i * bw, h - bh, Math.max(1, bw - 2), bh);
+          });
+          ctx.fillStyle = css("--text");
+          ctx.fillRect(0, h - (mean / top) * h, w, 1);
+        }
+        renderRing(s);
+      });
+    }
+
+    function renderRing(s) {
+      const { ctx, w } = canvasCtx(document.getElementById("ring"));
+      const shown = Math.min(s.vnodes, 64);
+      const ring = createRing({ vnodes: shown });
+      for (let i = 0; i < s.nodes; i++) ring.add(`node-${i}`);
+      const c = w / 2, r = w / 2 - 14;
+      const angle = (at) => (at / 4294967296) * Math.PI * 2 - Math.PI / 2;
+      const pts = ring.points;
+      ctx.lineWidth = 12;
+      // The arc ending at each point belongs to that point's node.
+      pts.forEach((p, i) => {
+        const prev = pts[(i - 1 + pts.length) % pts.length];
+        const idx = Number(p.node.split("-")[1]);
+        ctx.strokeStyle = `hsl(${(idx * 360) / s.nodes} 70% 62%)`;
+        let a0 = angle(prev.at), a1 = angle(p.at);
+        if (a1 <= a0) a1 += Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(c, c, r, a0, a1);
+        ctx.stroke();
+      });
+      ctx.fillStyle = css("--muted");
+      ctx.font = `12px ${css("--mono")}`;
+      const label = `${s.nodes} nodes x ${shown} points`;
+      ctx.fillText(label, c - ctx.measureText(label).width / 2, c + 4);
+    }
+
+    let t;
+    form.addEventListener("input", () => { clearTimeout(t); t = setTimeout(render, 60); });
+    window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(render, 100); });
+    render();
+    window.__hashlab = { compare, makeKeys };
+  </script>
+</body>
+</html>
