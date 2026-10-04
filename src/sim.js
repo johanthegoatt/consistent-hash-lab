@@ -38,12 +38,22 @@ function spread(owner, n) {
 
 const movedShare = (a, b) => a.reduce((s, o, i) => s + (o !== b[i]), 0) / a.length;
 
+// Keys that moved between two nodes that were both there before the join.
+// Zero is the consistency property; anything else is a needless cache miss.
+const crossShare = (a, b, joined) =>
+  a.reduce((s, o, i) => s + (o !== b[i] && b[i] !== joined), 0) / a.length;
+
 // Load spread at n nodes, then the share of keys that change owner when one
 // node joins (n -> n + 1). The ideal is 1 / (n + 1).
 export function compare({ keys, nodes, vnodes = 100, eps = 0.25, schemes = SCHEMES }) {
   return schemes.map((scheme) => {
     const at = placeAll(scheme, keys, nodes, { vnodes, eps });
     const grown = placeAll(scheme, keys, nodes + 1, { vnodes, eps });
-    return { scheme, ...spread(at, nodes), moved: movedShare(at, grown), ideal: 1 / (nodes + 1) };
+    return {
+      scheme, ...spread(at, nodes),
+      moved: movedShare(at, grown),
+      cross: crossShare(at, grown, `node-${nodes}`),
+      ideal: 1 / (nodes + 1),
+    };
   });
 }

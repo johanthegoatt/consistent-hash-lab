@@ -24,7 +24,8 @@
 
     <h2 class="section-h">1. One node joins</h2>
     <p class="section-p">Each card places every key on <span id="nText"></span>, then again on one more,
-      and counts the keys whose owner changed. The bars are keys per node before the join, with the
+      and counts the keys whose owner changed. The tag says whether every moved key went to the new
+      node, or how many moved between nodes that were already there. The bars are keys per node before the join, with the
       fair share marked.</p>
     <form id="controls" class="panel" aria-label="Simulation settings">
       <label>Nodes <output name="nodesOut"></output>
@@ -132,11 +133,12 @@ rendezvous("user:42", ["a", "b", "c"],
       const rows = compare({ keys: makeKeys(s.keys, s.seed), nodes: s.nodes, vnodes: s.vnodes, eps: s.eps, schemes: SCHEMES });
       const cards = rows.map((r) => {
         const el = document.createElement("article");
-        const good = r.moved < r.ideal * 1.5;
+        const good = r.cross === 0;
+        const verdict = good ? "new node only" : r.cross > 0.5 ? "reshuffles" : `${pct(r.cross)} cascade`;
         el.className = `panel card ${good ? "ok" : "bad"}`;
         el.innerHTML = `
-          <header><h3>${LABELS[r.scheme]}</h3><span class="verdict">${good ? "consistent" : "reshuffles"}</span></header>
-          <div class="big"><strong style="color:var(${good ? "--ok" : "--no"})">${pct(r.moved)}</strong><span>of keys moved, ideal ${pct(r.ideal)}</span></div>
+          <header><h3>${LABELS[r.scheme]}</h3><span class="verdict">${verdict}</span></header>
+          <div class="big"><strong style="color:var(${r.moved < 0.5 ? "--ok" : "--no"})">${pct(r.moved)}</strong><span>of keys moved, ideal ${pct(r.ideal)}</span></div>
           <canvas role="img" aria-label="${LABELS[r.scheme]}: keys per node, busiest node ${r.peakOverMean.toFixed(2)} times the fair share"></canvas>
           <dl>
             <div class="${r.peakOverMean > 1.2 ? "bad" : ""}"><dt>busiest</dt><dd>${r.peakOverMean.toFixed(2)}x</dd></div>

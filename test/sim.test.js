@@ -31,3 +31,10 @@ test("bounded loads flatten the ring's hottest node at some extra movement", () 
   assert.ok(r.bounded.peakOverMean <= 1.1 + 1e-9, `bounded ${r.bounded.peakOverMean}`);
   assert.ok(r.bounded.moved > r.ring.moved);
 });
+
+test("only modulo and bounded loads move keys between existing nodes", () => {
+  const r = byScheme(compare({ keys: makeKeys(20_000), nodes: 10, vnodes: 1 }));
+  for (const s of ["ring", "jump", "rendezvous"]) assert.equal(r[s].cross, 0, s);
+  assert.ok(r.modulo.cross > 0.8);
+  assert.ok(r.bounded.cross > 0);
+});
