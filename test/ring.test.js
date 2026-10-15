@@ -71,3 +71,23 @@ test("removing a node only drops it from each replica list", () => {
     assert.deepEqual(after.slice(0, kept.length), kept);
   });
 });
+
+test("a weight-2 node takes about twice the keys", () => {
+  const ring = createRing({ vnodes: 200 });
+  ring.add("small").add("big", { weight: 2 }).add("other");
+  const counts = { small: 0, big: 0, other: 0 };
+  for (const k of keys) counts[ring.lookup(k)]++;
+  const ratio = counts.big / ((counts.small + counts.other) / 2);
+  assert.ok(ratio > 1.7 && ratio < 2.3, `ratio ${ratio}`);
+});
+
+test("raising a node's weight only moves keys onto it", () => {
+  const ring = createRing({ vnodes: 100 });
+  ["a", "b", "c"].forEach((n) => ring.add(n));
+  const before = keys.map((k) => ring.lookup(k));
+  ring.add("b", { weight: 1.5 });
+  keys.forEach((k, i) => {
+    const now = ring.lookup(k);
+    if (now !== before[i]) assert.equal(now, "b");
+  });
+});

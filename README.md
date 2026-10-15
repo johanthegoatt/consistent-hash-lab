@@ -36,6 +36,7 @@ import { rendezvous, rendezvousN } from "./src/rendezvous.js";
 
 const ring = createRing({ vnodes: 100 });
 ["cache-a", "cache-b", "cache-c"].forEach((n) => ring.add(n));
+ring.add("cache-big", { weight: 2 });  // twice the vnodes, about twice the keys
 ring.lookup("user:42");
 ring.lookupN("user:42", 2);             // primary and replica, never the same node
 

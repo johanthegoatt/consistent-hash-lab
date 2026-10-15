@@ -6,11 +6,15 @@ import { murmur3 } from "./hash.js";
 export function createRing({ vnodes = 100, hash = murmur3 } = {}) {
   let points = []; // sorted [{ at, node }]
   const nodes = new Set();
+  // A node's weight scales its vnode count, and so its share of keys. Weight
+  // 2 is a machine with twice the memory; 0.5 one being drained gently.
+  const weights = new Map();
 
   function rebuild() {
     points = [];
     for (const node of nodes) {
-      for (let v = 0; v < vnodes; v++) points.push({ at: hash(`${node}#${v}`), node });
+      const count = Math.max(1, Math.round(vnodes * (weights.get(node) ?? 1)));
+      for (let v = 0; v < count; v++) points.push({ at: hash(`${node}#${v}`), node });
     }
     points.sort((a, b) => a.at - b.at || (a.node < b.node ? -1 : 1));
   }
@@ -26,8 +30,14 @@ export function createRing({ vnodes = 100, hash = murmur3 } = {}) {
   }
 
   return {
-    add(node) { nodes.add(String(node)); rebuild(); return this; },
-    remove(node) { nodes.delete(String(node)); rebuild(); return this; },
+    add(node, { weight = 1 } = {}) {
+      if (!(weight > 0)) throw new RangeError("weight must be positive");
+      nodes.add(String(node));
+      weights.set(String(node), weight);
+      rebuild();
+      return this;
+    },
+    remove(node) { nodes.delete(String(node)); weights.delete(String(node)); rebuild(); return this; },
     get nodes() { return [...nodes]; },
     get points() { return points; },
     successor,
