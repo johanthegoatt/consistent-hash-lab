@@ -32,14 +32,16 @@ All schemes hash with MurmurHash3 x86_32, checked against the reference vectors.
 ```js
 import { createRing } from "./src/ring.js";
 import { jumpHash } from "./src/jump.js";
-import { rendezvous } from "./src/rendezvous.js";
+import { rendezvous, rendezvousN } from "./src/rendezvous.js";
 
 const ring = createRing({ vnodes: 100 });
 ["cache-a", "cache-b", "cache-c"].forEach((n) => ring.add(n));
 ring.lookup("user:42");
+ring.lookupN("user:42", 2);             // primary and replica, never the same node
 
 jumpHash("user:42", 3);                 // 0, 1 or 2
 rendezvous("user:42", ["a", "b", "c"], { weights: { a: 1, b: 2, c: 1 } });
+rendezvousN("user:42", ["a", "b", "c"], 2);
 ```
 
 ## Layout

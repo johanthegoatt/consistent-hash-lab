@@ -47,3 +47,27 @@ test("more vnodes means a flatter load", () => {
   assert.ok(spread(200) < spread(1));
   assert.ok(spread(200) < 1.25);
 });
+
+test("lookupN gives distinct replicas, primary first", () => {
+  const ring = createRing({ vnodes: 50 });
+  ["a", "b", "c", "d", "e"].forEach((n) => ring.add(n));
+  for (let i = 0; i < 500; i++) {
+    const list = ring.lookupN(`key${i}`, 3);
+    assert.equal(list.length, 3);
+    assert.equal(new Set(list).size, 3);
+    assert.equal(list[0], ring.lookup(`key${i}`));
+  }
+  assert.equal(ring.lookupN("k", 10).length, 5);
+});
+
+test("removing a node only drops it from each replica list", () => {
+  const ring = createRing({ vnodes: 50 });
+  ["a", "b", "c", "d", "e"].forEach((n) => ring.add(n));
+  const before = Array.from({ length: 300 }, (_, i) => ring.lookupN(`key${i}`, 3));
+  ring.remove("c");
+  before.forEach((list, i) => {
+    const after = ring.lookupN(`key${i}`, 3);
+    const kept = list.filter((n) => n !== "c");
+    assert.deepEqual(after.slice(0, kept.length), kept);
+  });
+});

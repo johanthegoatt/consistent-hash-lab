@@ -35,5 +35,20 @@ export function createRing({ vnodes = 100, hash = murmur3 } = {}) {
       if (!points.length) throw new Error("ring is empty");
       return points[successor(hash(String(key)))].node;
     },
+    // Dynamo's preference list (DeCandia et al., SOSP 2007): walk clockwise
+    // and take the first `count` distinct nodes, skipping further vnodes of
+    // a node already chosen, so replicas never share a machine.
+    lookupN(key, count) {
+      if (!points.length) throw new Error("ring is empty");
+      const want = Math.min(count, nodes.size);
+      const chosen = [];
+      let i = successor(hash(String(key)));
+      while (chosen.length < want) {
+        const node = points[i].node;
+        if (!chosen.includes(node)) chosen.push(node);
+        i = (i + 1) % points.length;
+      }
+      return chosen;
+    },
   };
 }
