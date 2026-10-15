@@ -18,8 +18,8 @@
       <p class="lede">With <code>hash(key) % n</code>, growing a cluster from 10 to 11 nodes gives almost every
         key a new owner, and every one of those is a cold miss. Consistent hashing moves only the
         <strong>1/(n+1)</strong> share the new node should take. Below, one seeded key set runs through
-        <strong>five schemes</strong>: modulo, a vnode ring, jump hash, rendezvous hashing and bounded
-        loads. Everything runs in this tab.</p>
+        <strong>six schemes</strong>: modulo, a vnode ring, jump hash, rendezvous hashing, bounded
+        loads and Maglev. Everything runs in this tab.</p>
     </header>
 
     <h2 class="section-h">1. One node joins</h2>
@@ -100,6 +100,7 @@ rendezvous("user:42", ["a", "b", "c"],
       jump: "Jump hash",
       rendezvous: "Rendezvous",
       bounded: "Bounded loads",
+      maglev: "Maglev",
     };
     const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const pct = (v) => `${(v * 100).toFixed(1)}%`;

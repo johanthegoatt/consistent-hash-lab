@@ -3,8 +3,9 @@ import { createRing } from "./ring.js";
 import { jumpHash } from "./jump.js";
 import { rendezvous } from "./rendezvous.js";
 import { assignBounded } from "./bounded.js";
+import { createMaglev } from "./maglev.js";
 
-export const SCHEMES = ["modulo", "ring", "jump", "rendezvous", "bounded"];
+export const SCHEMES = ["modulo", "ring", "jump", "rendezvous", "bounded", "maglev"];
 
 export const makeKeys = (count, seed = 1) =>
   Array.from({ length: count }, (_, i) => `s${seed}:user:${i}`);
@@ -18,6 +19,10 @@ export function placeAll(scheme, keys, n, { vnodes = 100, eps = 0.25 } = {}) {
     case "modulo": return keys.map((k) => nodes[murmur3(k) % n]);
     case "jump": return keys.map((k) => nodes[jumpHash(k, n)]);
     case "rendezvous": return keys.map((k) => rendezvous(k, nodes));
+    case "maglev": {
+      const table = createMaglev(nodes);
+      return keys.map((k) => table.lookup(k));
+    }
     case "ring": case "bounded": {
       const ring = createRing({ vnodes });
       nodes.forEach((x) => ring.add(x));
